@@ -155,6 +155,10 @@
 #include "thr_lock.h"
 #include "violite.h"
 
+#include <string>
+
+using std::string;
+
 namespace dd {
 class Schema;
 }  // namespace dd
@@ -2559,6 +2563,139 @@ static inline bool check_if_backup_lock_has_to_be_acquired(LEX *lex)
   return sql_command_flags[lex->sql_command] & CF_ACQUIRE_BACKUP_LOCK;
 }
 
+template<typename T>
+string get_node_name(T* node)
+{
+    char buff[20];
+    sprintf(buff, "\"%lx\"", reinterpret_cast<uint64_t>(node));
+    string r(buff);
+    return r;
+}
+
+string get_node_label(THD* thd, SELECT_LEX_UNIT* lex_unit)
+{
+    if(!thd)
+        return "";
+    String str;
+    lex_unit->print(&str, QT_ORDINARY);
+    return "\"unit: " + string(str.c_ptr()) + "\"";
+}
+
+string get_node_label(THD* thd, PT_with_clause* with_clause)
+{
+    String str;
+    with_clause->print(thd, &str, QT_ORDINARY);
+    return "\"" + string(str.c_ptr()) + "\"";
+}
+
+string get_node_label(THD* thd, SELECT_LEX* lex)
+{
+    String str;
+    lex->print(thd, &str, QT_ORDINARY);
+    return "\"" + string(str.c_ptr()) + "\"";
+}
+
+string get_node_label(THD* thd, PT_with_list* m_list)
+{
+    if(!thd)
+        return "";
+    string result = "";
+    for (auto el : (*m_list).elements())
+    {
+        result += string(el->name().str) + ",";
+    }
+    return "\"" + result.substr(0, result.size()-1) + "\"";
+}
+
+/*
+string get_node_label(THD* thd, SELECT_LEX* lex)
+{
+    string db_tables = "";
+	SQL_I_List<TABLE_LIST> table_list= lex->table_list;
+
+	for (TABLE_LIST *tl=table_list.first; tl; tl= tl->next_local)
+	{
+		std::string db= tl->db, table= tl->table_name, alias;
+		//std::string db_table= normalize_name(db) + "." + normalize_name(table);
+		std::string db_table= db + "." + table;
+
+		db_tables+=db_table;
+		db_tables+=" ";
+	}
+    return string("\"" + db_tables + "\"");
+}
+*/
+
+int gen_select_lex_unit_dot(THD* thd, SELECT_LEX_UNIT* lex_unit, string& s);
+
+int gen_select_lex_dot(THD* thd, SELECT_LEX* lex, string& s)
+{
+    s += get_node_name(lex) + " [shape = box, color = green, style=solid, label=" + get_node_label(thd, lex) + "]\n";
+    if(lex->master_unit())
+    {
+        s += get_node_name(lex) + " -> " + get_node_name(lex->master_unit()) + "[label=\"master\"]\n";
+    }
+    if(lex->first_inner_unit())
+    {
+        s += get_node_name(lex) + " -> " + get_node_name(lex->first_inner_unit()) + "[label=\"slave\"]\n";
+        gen_select_lex_unit_dot(thd, lex->first_inner_unit(), s);
+    }
+    if(lex->next_select())
+    {
+        s += get_node_name(lex) + " -> " + get_node_name(lex->next_select()) + "[label=\"next\"]\n";
+        gen_select_lex_dot(thd, lex->next_select(), s);
+    }
+    /*
+    if(lex->next_select_in_list())
+    {
+        s += get_node_name(lex) + " -> " + get_node_name(lex->next_select_in_list()) + "[label=\"link_next\"]\n";
+    }
+    */
+    return 0;
+
+}
+
+int gen_select_lex_unit_dot(THD* thd, SELECT_LEX_UNIT* lex_unit, string& s)
+{
+    s += get_node_name(lex_unit) + " [shape = box, color = red, style=solid, label=" + get_node_label(thd, lex_unit) + "]\n";
+    if(lex_unit->outer_select())
+    {
+        s += get_node_name(lex_unit) + " -> " + get_node_name(lex_unit->outer_select()) + "[label=\"master\"]\n";
+    }
+    if(lex_unit->first_select())
+    {
+        s += get_node_name(lex_unit) + " -> " + get_node_name(lex_unit->first_select()) + "[label=\"slave\"]\n";
+        gen_select_lex_dot(thd, lex_unit->first_select(), s);
+    }
+    if(lex_unit->next_unit())
+    {
+        s += get_node_name(lex_unit) + " -> " + get_node_name(lex_unit->next_unit()) + "[label=\"next\"]\n";
+        gen_select_lex_unit_dot(thd, lex_unit->next_unit(), s);
+    }
+    if(lex_unit->m_with_clause)
+    {
+        s += get_node_name(lex_unit->m_with_clause) + " [shape = box, color = yellow, style=solid, label=" + get_node_label(thd, lex_unit->m_with_clause) + "]\n";
+        s += get_node_name(lex_unit) + " -> " + get_node_name(lex_unit->m_with_clause) + "[label=\"m_with_clause\"]\n";
+
+        s += get_node_name(lex_unit->m_with_clause->get_m_list()) + "[shape = box, color=blue, style=solid, label=" + get_node_label(thd, lex_unit->m_with_clause->get_m_list()) + "]\n";
+        s += get_node_name(lex_unit->m_with_clause) + " -> " + get_node_name(lex_unit->m_with_clause->get_m_list()) + "[label=\"m_list\"]\n";
+    }
+    return 0;
+}
+
+int gen_lex_dot_start(THD* thd)
+{
+    LEX* lex = thd->lex;
+    string s = "digraph lex {\n";
+    s += "0 [shape = box, color = black, style=solid, label=\"" + string(thd->query().str) + "\"]\n";
+    s += "0 -> " + get_node_name(lex->unit) + "\n";
+    gen_select_lex_unit_dot(thd, lex->unit, s);
+    s += "}\n";
+    int fd = open("./lex.dot", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    write(fd, s.c_str(), s.size());
+    close(fd);
+    return 0;
+}
 
 /**
   Execute command saved in thd and lex->sql_command.
@@ -2580,6 +2717,7 @@ static inline bool check_if_backup_lock_has_to_be_acquired(LEX *lex)
 int
 mysql_execute_command(THD *thd, bool first_level)
 {
+  gen_lex_dot_start(thd);  // test gen lex dot
   int res= FALSE;
   LEX  *const lex= thd->lex;
   /* first SELECT_LEX (have special meaning for many of non-SELECTcommands) */

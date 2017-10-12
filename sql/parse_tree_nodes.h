@@ -440,6 +440,11 @@ public:
   { m_most_inner_in_parsing= old; }
   void print(THD *thd, String *str, enum_query_type query_type);
 
+  /**
+    add by dongzhi
+   */
+  PT_with_list* get_m_list() { return const_cast<PT_with_list*>(&m_list); }
+
 private:
   /// All CTEs of this clause
   const PT_with_list &m_list;

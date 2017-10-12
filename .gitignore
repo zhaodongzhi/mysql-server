@@ -2774,6 +2774,9 @@ internal/tests/innorwlocktest
 packaging/solaris/postinstall-solaris
 internal/tests/open_files_limit
 client/mysql_ssl_rsa_setup
+build/*
+*.patch
+*.diff
 
 # Allow
 !include/*/boost/geometry/*
