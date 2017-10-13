@@ -2578,21 +2578,21 @@ string get_node_label(THD* thd, SELECT_LEX_UNIT* lex_unit)
         return "";
     String str;
     lex_unit->print(&str, QT_ORDINARY);
-    return "\"unit: " + string(str.c_ptr()) + "\"";
+    return "\"unit: " + string(str.ptr()) + "\"";
 }
 
 string get_node_label(THD* thd, PT_with_clause* with_clause)
 {
     String str;
     with_clause->print(thd, &str, QT_ORDINARY);
-    return "\"" + string(str.c_ptr()) + "\"";
+    return "\"" + string(str.ptr()) + "\"";
 }
 
 string get_node_label(THD* thd, SELECT_LEX* lex)
 {
     String str;
     lex->print(thd, &str, QT_ORDINARY);
-    return "\"" + string(str.c_ptr()) + "\"";
+    return "\"" + string(str.ptr()) + "\"";
 }
 
 string get_node_label(THD* thd, PT_with_list* m_list)

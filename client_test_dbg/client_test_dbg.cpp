@@ -42,8 +42,7 @@ string testdb;
 #define STRING_SIZE 50
 
 #define DROP_SAMPLE_TABLE "DROP TABLE IF EXISTS test_json"
-#define CREATE_SAMPLE_TABLE "CREATE TABLE test_json(id INT primary key AUTO_INCREMENT, value json)shardkey=id"
-//#define CREATE_SAMPLE_TABLE "CREATE TABLE test_json(id INT primary key AUTO_INCREMENT, value json)"
+#define CREATE_SAMPLE_TABLE "CREATE TABLE test_json(id INT primary key AUTO_INCREMENT, value json)"
 #define INSERT_SAMPLE "INSERT INTO test_json(value) VALUES(?)"
 
 
