@@ -168,10 +168,8 @@ void dotest()
         delete mysql;
 }
 
-void dotest1()
+bool select_stmt_cursor_setting(MYSQL* mysql, const char* stmtSql)
 {
-    //int timeout = 10;
-    MYSQL* mysql = new MYSQL;
     //MYSQL_RES *result;
     //MYSQL_ROW row;
     //my_bool reconnect = 0;
@@ -180,6 +178,141 @@ void dotest1()
     MYSQL_BIND    bResult[2];
     //unsigned long length[1];
     int        int_data;
+
+    char str_data[STRING_SIZE];
+    unsigned long type = (unsigned long) CURSOR_TYPE_READ_ONLY;
+    //unsigned long length[2];
+
+    stmt = mysql_stmt_init(mysql);
+
+    if (mysql_stmt_prepare(stmt, stmtSql, strlen(stmtSql)))
+    {
+        fprintf(stderr, " mysql_stmt_prepare(), select failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+    fprintf(stdout, " prepare select sucessfull\n");
+
+    memset(bind, 0, sizeof(bind));
+    bind[0].buffer_type= MYSQL_TYPE_LONG;
+    bind[0].buffer= (char *)&int_data;
+    //bind[0].buffer_length= 4;
+    if(mysql_stmt_bind_param(stmt, bind))
+    {
+        fprintf(stderr, " mysql_stmt_bind_param() failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+
+    int param_count= mysql_stmt_param_count(stmt);
+    fprintf(stdout, " total parameters in select: %d\n", param_count);
+
+    if (param_count != 1) // validate parameter count
+    {
+        fprintf(stderr, " invalid parameter count returned by MySQL\n");
+    }
+
+    memset(bResult, 0, sizeof(bResult));
+    bResult[0].buffer_type= MYSQL_TYPE_LONG;
+    bResult[0].buffer= (char *)&int_data;
+
+    bResult[1].buffer_type= MYSQL_TYPE_JSON;
+    bResult[1].buffer= (char *)str_data;
+    bResult[1].buffer_length= STRING_SIZE;
+
+    if(mysql_stmt_bind_result(stmt, bResult))
+    {
+        fprintf(stderr, " mysql_stmt_bind_result() failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+
+    int_data= 1234;
+    type = (unsigned long) CURSOR_TYPE_READ_ONLY;
+    mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, (void*) &type);
+
+    unsigned long prefetch_rows = 2;
+    mysql_stmt_attr_set(stmt, STMT_ATTR_PREFETCH_ROWS, (void*) &prefetch_rows);
+    mysql_stmt_execute(stmt);
+
+    while(!mysql_stmt_fetch(stmt)) {
+        printf("select_stmt_cursor_setting - %d %s \n", int_data, str_data); 
+    }
+
+    mysql_stmt_close(stmt);
+
+    return true;
+}
+
+bool select_stmt_normal(MYSQL* mysql, const char* stmtSql)
+{
+    //MYSQL_RES *result;
+    //MYSQL_ROW row;
+    //my_bool reconnect = 0;
+    MYSQL_STMT    *stmt;
+    MYSQL_BIND    bind[1];
+    MYSQL_BIND    bResult[2];
+    //unsigned long length[1];
+    int        int_data;
+
+    char str_data[STRING_SIZE];
+    unsigned long type = (unsigned long) CURSOR_TYPE_READ_ONLY;
+    //unsigned long length[2];
+
+    stmt = mysql_stmt_init(mysql);
+
+    if (mysql_stmt_prepare(stmt, stmtSql, strlen(stmtSql)))
+    {
+        fprintf(stderr, " mysql_stmt_prepare(), select failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+    fprintf(stdout, " prepare select sucessfull\n");
+
+    memset(bind, 0, sizeof(bind));
+    bind[0].buffer_type= MYSQL_TYPE_LONG;
+    bind[0].buffer= (char *)&int_data;
+    //bind[0].buffer_length= 4;
+    if(mysql_stmt_bind_param(stmt, bind))
+    {
+        fprintf(stderr, " mysql_stmt_bind_param() failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+
+    int param_count= mysql_stmt_param_count(stmt);
+    fprintf(stdout, " total parameters in select: %d\n", param_count);
+
+    if (param_count != 1) // validate parameter count
+    {
+        fprintf(stderr, " invalid parameter count returned by MySQL\n");
+    }
+
+    memset(bResult, 0, sizeof(bResult));
+    bResult[0].buffer_type= MYSQL_TYPE_LONG;
+    bResult[0].buffer= (char *)&int_data;
+
+    bResult[1].buffer_type= MYSQL_TYPE_JSON;
+    bResult[1].buffer= (char *)str_data;
+    bResult[1].buffer_length= STRING_SIZE;
+
+    if(mysql_stmt_bind_result(stmt, bResult))
+    {
+        fprintf(stderr, " mysql_stmt_bind_result() failed\n");
+        fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
+    }
+
+    int_data= 1234;
+    mysql_stmt_execute(stmt);
+
+    while(!mysql_stmt_fetch(stmt)) {
+        printf("select_stmt_normal - %d %s \n", int_data, str_data); 
+    }
+
+    mysql_stmt_close(stmt);
+
+    return true;
+}
+
+void dotest1()
+{
+    //int timeout = 10;
+    MYSQL* mysql = new MYSQL;
     mysql = mysql_init(mysql);
     //const char *normalSql = "select id from t1 where value=1";
     const char *stmtSql = "select id, value from test_json where value = ?";
@@ -189,6 +322,8 @@ void dotest1()
     MYSQL* tmp = mysql_real_connect(mysql, ip.c_str(), username.c_str(), password.c_str(), testdb.c_str(), port, NULL, 0);
     if(tmp)
     {
+        select_stmt_cursor_setting(mysql, stmtSql);
+        select_stmt_normal(mysql, stmtSql);
         /*
         // 1. normal buffer
         mysql_query(mysql, normalSql);
@@ -233,8 +368,10 @@ void dotest1()
         mysql_stmt_close(stmt);
         */
         // 4. stmt unbuffer
+        /*
         char str_data[STRING_SIZE];
         //unsigned long length[2];
+        
         stmt = mysql_stmt_init(mysql);
 
         if (mysql_stmt_prepare(stmt, stmtSql, strlen(stmtSql)))
@@ -254,11 +391,10 @@ void dotest1()
             fprintf(stderr, " %s\n", mysql_stmt_error(stmt));
         }
 
-        /* Get the parameter count from the statement */
         int param_count= mysql_stmt_param_count(stmt);
         fprintf(stdout, " total parameters in select: %d\n", param_count);
 
-        if (param_count != 1) /* validate parameter count */
+        if (param_count != 1) // validate parameter count
         {
             fprintf(stderr, " invalid parameter count returned by MySQL\n");
         }
@@ -278,17 +414,18 @@ void dotest1()
         }
 
         int_data= 1234;
-        mysql_stmt_execute(stmt);
 
         while(!mysql_stmt_fetch(stmt)) {
             printf("4 - %d %s \n", int_data, str_data); 
         }
         
         mysql_stmt_close(stmt);
+        */
 
         //unsigned long type = (unsigned long) CURSOR_TYPE_READ_ONLY;
-        /*
+        
         // 5. stmt server cursor default
+        /*
         stmt = mysql_stmt_init(mysql);
 
         mysql_stmt_prepare(stmt, stmtSql, strlen(stmtSql));
@@ -314,7 +451,6 @@ void dotest1()
 
         mysql_stmt_close(stmt);
         */
-
         // 6. stmt server cursor setting
         /*stmt = mysql_stmt_init(mysql);
 
@@ -361,7 +497,7 @@ int main ( int argc , char **argv ) {
     username = string(argv[3]);
     password = string(argv[4]);
     testdb = string(argv[5]);
-    dotest();
+    //dotest();
     dotest1();
     return 0;
 }
