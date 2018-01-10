@@ -2777,6 +2777,7 @@ client/mysql_ssl_rsa_setup
 build/*
 *.patch
 *.diff
+client_test_dbg/*
 
 # Allow
 !include/*/boost/geometry/*
