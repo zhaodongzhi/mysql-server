@@ -2572,12 +2572,12 @@ class Gen_lex_dot
     int unit_v;
     int select_v;
     int table_v;
+    int item_v;
 
     template<typename T>
       string get_node_name(T* node)
       {
         char buff[20];
-        //sprintf(buff, "\"%lx\"", reinterpret_cast<uint64_t>(node));
         sprintf(buff, "\"%p\"", node);
         string r(buff);
         return r;
@@ -2587,21 +2587,21 @@ class Gen_lex_dot
     {
       String str;
       lex_unit->print(&str, QT_ORDINARY);
-      return "\"unit" + std::to_string(unit_v++) + ": " + string(str.ptr()) + "\"";
+      return "\"unit" + std::to_string(unit_v++) + ": " + string(str.ptr(), str.length()) + "\"";
     }
 
     string get_node_label(PT_with_clause* with_clause)
     {
       String str;
       with_clause->print(thd, &str, QT_ORDINARY);
-      return "\"" + string(str.ptr()) + "\"";
+      return "\"" + string(str.ptr(), str.length()) + "\"";
     }
 
     string get_node_label(SELECT_LEX* lex)
     {
       String str;
       lex->print(thd, &str, QT_ORDINARY);
-      return "\"select" + std::to_string(select_v++) + ": " + string(str.ptr()) + "\"";
+      return "\"select" + std::to_string(select_v++) + ": " + string(str.ptr(), str.length()) + "\"";
     }
 
     string get_node_label(PT_with_list* m_list)
@@ -2618,7 +2618,14 @@ class Gen_lex_dot
     {
       String str;
       table->print(thd, &str, QT_ORDINARY);
-      return "\"table" + std::to_string(table_v++) + ": " + string(str.ptr()) + "\"";
+      return "\"table" + std::to_string(table_v++) + ": " + string(str.ptr(), str.length()) + "\"";
+    }
+
+    string get_node_label(Item* item)
+    {
+      String str;
+      item->print(&str, QT_ORDINARY);
+      return "\"Item" + std::to_string(item_v++) + ": " + string(str.ptr(), str.length()) + "\"";
     }
 
     int gen_table_list_dot(TABLE_LIST* top_table, string& s)
@@ -2639,6 +2646,12 @@ class Gen_lex_dot
           s += get_node_name(top_table) + " -> " + get_node_name(table_left) + "[label=\"nested_join->join_list[1]\"]\n";
           gen_table_list_dot(table_left, s);
         }
+      }
+      Item* join_cond = top_table->join_cond();
+      if(join_cond)
+      {
+        s += get_node_name(join_cond) + " [shape = box, color = green, style=solid, label=" + get_node_label(join_cond) + "]\n"; 
+        s += get_node_name(top_table) + " -> " + get_node_name(join_cond) + "[label=\"join_cond\"]\n";
       }
       return 0;
     }
@@ -2722,7 +2735,8 @@ class Gen_lex_dot
       dot_file_name(_dot_file_name), 
       unit_v(0),
       select_v(0),
-      table_v(0)
+      table_v(0),
+      item_v(0)
       {}
 
     int start()
