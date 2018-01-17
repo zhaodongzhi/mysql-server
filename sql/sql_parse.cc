@@ -2638,7 +2638,7 @@ class Gen_lex_dot
           if(table)
           {
             s += get_node_name(top_table) + " -> " + get_node_name(table) + "[label=\"nested_join->join_list[" + std::to_string(index++) + "]\"]\n";
-            gen_table_list_dot(table, s);
+            gen_table_list_dot(table, s); 
           }
         }
       }
@@ -2731,6 +2731,25 @@ class Gen_lex_dot
       return 0;
     }
 
+    int gen_global_table_list_dot(SELECT_LEX* lex, string& s)
+    {
+      if(lex)
+      {
+        TABLE_LIST* curr_table = lex->get_table_list();
+        if(curr_table)
+          s += get_node_name(lex) + " -> " + get_node_name(curr_table) + "[label=\"table_list.first\"]\n";
+        while(curr_table)
+        {
+          if(curr_table->next_global)
+          {
+            s += get_node_name(curr_table) + " -> " + get_node_name(curr_table->next_global) + "[label=\"next_global\"]\n";
+          }
+          curr_table = curr_table->next_global;
+        }
+      }
+      return 0;
+    }
+
   public:
     Gen_lex_dot(THD* _thd, const char* _dot_file_name):
       thd(_thd),
@@ -2743,8 +2762,12 @@ class Gen_lex_dot
       LEX* lex = thd->lex;
       string s = "digraph lex {\n";
       s += "0 [shape = box, color = black, style=solid, label=\"" + string(thd->query().str) + "\"]\n";
-      s += "0 -> " + get_node_name(lex->unit) + "\n";
-      gen_select_lex_unit_dot(lex->unit, s);
+      if(lex->unit)
+      {
+        s += "0 -> " + get_node_name(lex->unit) + "\n";
+        gen_select_lex_unit_dot(lex->unit, s);
+        //gen_global_table_list_dot(lex->unit->first_select(), s);
+      }
       s += "}\n";
       int fd = open(dot_file_name.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
       write(fd, s.c_str(), s.size());
